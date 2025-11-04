@@ -69,7 +69,22 @@ export default function Trips() {
 
     const handleEdit = (trip) => {
         const locked = (trip.places || []).map(p => (typeof p === 'string' ? p : p._id));
-        navigate("/trips/plan", { state: { lockedPlaceIds: locked, suggestedTitle: trip.name } });
+        navigate("/trips/plan", { 
+            state: { 
+                lockedPlaceIds: locked, 
+                suggestedTitle: trip.name,
+                editingTripId: trip._id,
+                existingTrip: {
+                    name: trip.name,
+                    description: trip.description,
+                    startDate: trip.startDate,
+                    endDate: trip.endDate,
+                    budget: trip.budget,
+                    preferences: trip.preferences,
+                    itinerary: trip.itinerary
+                }
+            } 
+        });
     };
 
     const handleComplete = async (tripId, completed) => {

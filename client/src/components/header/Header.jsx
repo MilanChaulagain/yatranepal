@@ -68,7 +68,7 @@ const Header = () => {
     { id: "home", icon: <Home className="nav-icon" />, label: "Home", href: "/" },
     { id: "places", icon: <FaLocationArrow className="nav-icon" />, label: "Places", href: "/places" },
     { id: "stays", icon: <Bed className="nav-icon" />, label: "Stays", href: "/stays" },
-    { id: "flights", icon: <Plane className="nav-icon" />, label: "Flights", href: "/flights" },
+    // { id: "flights", icon: <Plane className="nav-icon" />, label: "Flights", href: "/flights" },
     { id: "money-exchange", icon: <FaMoneyBill className="nav-icon" />, label: "Exchange", href: "/money-exchange" },
     { id: "touristguide", icon: <FaPersonBooth className="nav-icon" />, label: "Guide", href: "/touristguide" },
     {

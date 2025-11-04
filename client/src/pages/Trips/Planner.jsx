@@ -28,6 +28,8 @@ export default function Planner() {
   const location = useLocation();
   const state = location.state || {};
   const preLocked = state.lockedPlaceIds || [];
+  const editingTripId = state.editingTripId;
+  const existingTrip = state.existingTrip;
 
   const { data: placesRes = [] } = useFetch("/api/place");
   const { data: hotelsRes = [] } = useFetch("/api/hotels");
@@ -35,17 +37,17 @@ export default function Planner() {
   const hotels = useMemo(() => (Array.isArray(hotelsRes?.data) ? hotelsRes.data : Array.isArray(hotelsRes) ? hotelsRes : []), [hotelsRes]);
 
   const [selectedPlaceIds, setSelectedPlaceIds] = useState(new Set(preLocked));
-  const [tripName, setTripName] = useState(state.suggestedTitle || "My Trip");
-  const [budget, setBudget] = useState(30000);
-  const [pace, setPace] = useState("standard");
-  const [interests, setInterests] = useState([]);
+  const [tripName, setTripName] = useState(existingTrip?.name || state.suggestedTitle || "My Trip");
+  const [budget, setBudget] = useState(existingTrip?.budget?.total || 30000);
+  const [pace, setPace] = useState(existingTrip?.preferences?.pace || "standard");
+  const [interests, setInterests] = useState(existingTrip?.preferences?.interests || []);
   const [startCoords, setStartCoords] = useState([85.3240, 27.7172]); // [lng, lat] Kathmandu default
   const [useMyLocation, setUseMyLocation] = useState(false);
-  const [startDate, setStartDate] = useState(isoToday());
-  const [endDate, setEndDate] = useState(isoToday());
+  const [startDate, setStartDate] = useState(existingTrip?.startDate ? existingTrip.startDate.split('T')[0] : isoToday());
+  const [endDate, setEndDate] = useState(existingTrip?.endDate ? existingTrip.endDate.split('T')[0] : isoToday());
   const [filter, setFilter] = useState("");
   const [planning, setPlanning] = useState(false);
-  const [trip, setTrip] = useState(null);
+  const [trip, setTrip] = useState(existingTrip?.itinerary ? existingTrip : null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -124,10 +126,20 @@ export default function Planner() {
     try {
       const payload = { ...trip };
       delete payload.unsaved;
-      const res = await api.post("/trips", payload);
+      
+      let res;
+      if (editingTripId) {
+        // Update existing trip
+        res = await api.put(`/trips/${editingTripId}`, payload);
+        toast.success("Trip updated");
+      } else {
+        // Create new trip
+        res = await api.post("/trips", payload);
+        toast.success("Trip saved");
+      }
+      
       setTrip(res.data?.data || res.data);
       setIsSaved(true);
-      toast.success("Trip saved");
     } catch (err) {
       console.error("Save failed", err);
       setError(err.response?.data?.message || err.message || "Failed to save trip");
@@ -155,8 +167,8 @@ export default function Planner() {
     <div>
       <Navbar />
   <div className={`container planner ${planning ? 'is-planning' : ''}`}>
-        <h1 className="planner-title">Plan Your Trip</h1>
-        {state.suggestedTitle && <p style={{ color: "#666" }}>Suggested plan: {state.suggestedTitle}</p>}
+        <h1 className="planner-title">{editingTripId ? "Edit Your Trip" : "Plan Your Trip"}</h1>
+        {state.suggestedTitle && !editingTripId && <p style={{ color: "#666" }}>Suggested plan: {state.suggestedTitle}</p>}
 
         <form onSubmit={handleSubmit} className="planner-form">
           <div className="planner-form-top">
@@ -233,7 +245,9 @@ export default function Planner() {
           {error && <div className="form-error">{error}</div>}
 
           <div className="actions">
-            <button type="submit" className="button-17" disabled={planning}>{planning ? "Planning..." : "Create Trip"}</button>
+            <button type="submit" className="button-17" disabled={planning}>
+              {planning ? "Planning..." : editingTripId ? "Update Trip" : "Create Trip"}
+            </button>
           </div>
         </form>
 
@@ -246,7 +260,7 @@ export default function Planner() {
             </div>
             <div className="actions actions-between" style={{ marginTop: 16 }}>
               <button className="button-17" onClick={handleSave} disabled={saving || isSaved}>
-                {saving ? "Saving..." : isSaved ? "Trip saved" : "Save Trip"}
+                {saving ? "Saving..." : isSaved ? (editingTripId ? "Trip updated" : "Trip saved") : (editingTripId ? "Update Trip" : "Save Trip")}
               </button>
               {isSaved && (
                 <button className="button-17" onClick={() => setShowDetails(true)} style={{ marginLeft: 'auto' }}>

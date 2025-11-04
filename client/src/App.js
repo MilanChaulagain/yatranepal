@@ -97,7 +97,7 @@ const AppContent = () => {
         <Route path="/placedetails/:id" element={<PlaceDetails />} />
         <Route path="/travellers-choice" element={<TravellersChoice />} />
         <Route path="/travel-stories" element={<TravelStories />} />
-  <Route path="/share-story" element={<RequireAuth><ShareStory /></RequireAuth>} />
+        <Route path="/share-story" element={<RequireAuth><ShareStory /></RequireAuth>} />
         <Route path="/trips" element={<RequireAuth><Trips /></RequireAuth>} />
         <Route path="/trips/create" element={<RequireAuth><CreateTrip /></RequireAuth>} />
         <Route path="/trips/plan" element={<RequireAuth><Planner /></RequireAuth>} />

@@ -9,7 +9,7 @@ import {toast} from "react-hot-toast"
 
 const Login = () => {
     const [credentials, setCredentials] = useState({
-        identifier: "", // This will hold either username or email
+        identifier: "", 
         password: "",
     });
 
