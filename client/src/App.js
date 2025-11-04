@@ -24,6 +24,7 @@ import TravellersChoice from "./pages/Discover/TravellerChoise/TravellersChoice"
 import TravelStories from "./pages/Discover/TravellersStories/TravellersStories";
 import ShareStory from "./pages/Discover/ShareStory/ShareStory";
 import Trips from "./pages/Trips/trips";
+import TripDetails from "./pages/Trips/TripDetails";
 import CreateTrip from "./pages/Trips/CreateTrip";
 import WriteReview from "./pages/ReviewAll/writereview/writereview";
 import AllReviewsPage from "./pages/ReviewAll/viewreview/viewreview";
@@ -99,6 +100,7 @@ const AppContent = () => {
         <Route path="/travel-stories" element={<TravelStories />} />
         <Route path="/share-story" element={<RequireAuth><ShareStory /></RequireAuth>} />
         <Route path="/trips" element={<RequireAuth><Trips /></RequireAuth>} />
+        <Route path="/trips/:id" element={<RequireAuth><TripDetails /></RequireAuth>} />
         <Route path="/trips/create" element={<RequireAuth><CreateTrip /></RequireAuth>} />
         <Route path="/trips/plan" element={<RequireAuth><Planner /></RequireAuth>} />
         <Route path="/write-review" element={<WriteReview />} />

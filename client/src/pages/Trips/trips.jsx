@@ -235,6 +235,7 @@ export default function Trips() {
                                             </div>
                                         ) : null}
                                         <div className="trip-actions">
+                                            <button className="view-btn" onClick={() => navigate(`/trips/${trip._id}`)}>View Details</button>
                                             <button className="edit-btn" onClick={() => handleEdit(trip)}>Edit</button>
                                             <button className="complete-btn" onClick={() => handleComplete(trip._id, !trip.isCompleted)}>
                                                 {trip.isCompleted ? 'Mark Incomplete' : 'Mark Completed'}
