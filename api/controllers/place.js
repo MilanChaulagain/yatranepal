@@ -41,20 +41,14 @@ export const getAllPlaces = async (req, res) => {
             radius,
             limit = 50,
             page = 1,
-            sort = '-createdAt'
+            sort = '-popularityScore'
         } = req.query;
 
         const query = {};
         
-        // Search across multiple fields
+        // Search using text index for better performance
         if (search) {
-            query.$or = [
-                { name: { $regex: search, $options: 'i' } },
-                { description: { $regex: search, $options: 'i' } },
-                { address: { $regex: search, $options: 'i' } },
-                { category: { $regex: search, $options: 'i' } },
-                { city: { $regex: search, $options: 'i' } }
-            ];
+            query.$text = { $search: search };
         }
 
         // Filter by city
@@ -67,28 +61,30 @@ export const getAllPlaces = async (req, res) => {
             query.category = category;
         }
 
+        // For location-based queries, use geospatial query
+        if (lat && lng && radius) {
+            query.location = {
+                $near: {
+                    $geometry: {
+                        type: 'Point',
+                        coordinates: [parseFloat(lng), parseFloat(lat)]
+                    },
+                    $maxDistance: parseFloat(radius) * 1000 // Convert km to meters
+                }
+            };
+        }
+
         const skip = (page - 1) * limit;
         const total = await Place.countDocuments(query);
         
-        let places = await Place.find(query)
-            .sort(sort)
+        // Select only necessary fields for list view - reduces data transfer
+        const places = await Place.find(query)
+            .select('name description category city location img entranceFee popularityScore avgVisitMins')
+            .sort(search ? { score: { $meta: 'textScore' } } : sort)
             .limit(+limit)
             .skip(skip)
-            .lean();
-
-        // Apply radius filter if coordinates provided
-        if (lat && lng && radius) {
-            places = places.filter((place) => {
-                if (!place.location?.coordinates) return false;
-                const distance = calculateDistance(
-                    parseFloat(lat),
-                    parseFloat(lng),
-                    place.location.coordinates[1],
-                    place.location.coordinates[0]
-                );
-                return distance <= parseFloat(radius);
-            });
-        }
+            .lean()
+            .exec();
 
         res.status(200).json({
             success: true,
@@ -99,6 +95,7 @@ export const getAllPlaces = async (req, res) => {
             data: places,
         });
     } catch (error) {
+        console.error('Get places error:', error);
         res.status(500).json({ 
             success: false,
             error: error.message 

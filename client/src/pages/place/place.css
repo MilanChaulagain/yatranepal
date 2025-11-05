@@ -564,6 +564,7 @@
     height: 180px;
     position: relative;
     overflow: hidden;
+    background: #f0f0f0;
 }
 
 .place-image {
@@ -571,6 +572,11 @@
     height: 100%;
     object-fit: cover;
     transition: transform 0.8s cubic-bezier(0.2, 0.9, 0.4, 1);
+    display: block;
+    opacity: 1;
+    visibility: visible;
+    position: relative;
+    z-index: 1;
 }
 
 .place-card:hover .place-image {
@@ -1328,3 +1334,65 @@
 .places-modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .places-ghost-btn { background: #f1f5f9; color: #0f172a; border: none; border-radius: 8px; padding: 0.5rem 0.9rem; font-weight: 600; cursor: pointer; }
 .places-ghost-btn:hover { background: #e2e8f0; }
+
+/* Load More Button Styles */
+.load-more-container {
+    display: flex;
+    justify-content: center;
+    padding: 40px 20px;
+    margin-top: 20px;
+}
+
+.load-more-btn {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 16px 48px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(74, 109, 229, 0.3);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 200px;
+    justify-content: center;
+}
+
+.load-more-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(74, 109, 229, 0.4);
+}
+
+.load-more-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.loader-small {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Optimize image loading */
+.place-image {
+    transition: opacity 0.3s ease;
+}
+
+.place-image[loading="lazy"] {
+    opacity: 0;
+}
+
+.place-image[loading="lazy"].loaded {
+    opacity: 1;
+}

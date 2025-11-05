@@ -57,5 +57,13 @@ const placeSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+// Add indexes for better query performance
+placeSchema.index({ city: 1 });
+placeSchema.index({ category: 1 });
+placeSchema.index({ name: 'text', description: 'text', city: 'text' });
+placeSchema.index({ location: '2dsphere' });
+placeSchema.index({ popularityScore: -1 });
+placeSchema.index({ createdAt: -1 });
+
 const Place = mongoose.models.Place || mongoose.model('Place', placeSchema);
 export default Place;

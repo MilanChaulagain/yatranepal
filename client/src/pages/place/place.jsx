@@ -148,13 +148,6 @@ const localExperiences = [
 
 const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8800";
 
-const getImageUrl = (imagePath) => {
-  if (!imagePath) return "/images/placeholder.jpg";
-  if (imagePath.startsWith("http")) return imagePath;
-  return `${BASE_URL}${imagePath.startsWith('/') ? imagePath : '/' + imagePath}`;
-};
-
-
 //Haversine Algorithm
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371;
@@ -257,6 +250,7 @@ const Places = () => {
   const location = useRouterLocation(); 
   const [places, setPlaces] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
   const [errorModal, setErrorModal] = useState({ open: false, message: "" });
   const [selectedCity, setSelectedCity] = useState("all");
@@ -270,11 +264,17 @@ const Places = () => {
   const [placesWithDistances, setPlacesWithDistances] = useState([]);
   const [radius, setRadius] = useState(10);
   const [availableCities, setAvailableCities] = useState([]);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   // Refs to track state and prevent infinite loops
   const locationRequested = useRef(false);
   const prevFilters = useRef({});
   const isInitialMount = useRef(true);
+  const observerRef = useRef(null);
 
   // Initial scroll effects
   useEffect(() => {
@@ -321,7 +321,7 @@ const Places = () => {
     fetchAvailableCities();
   }, []);
 
-  // Main useEffect for fetching places - FIXED
+  // Main useEffect for fetching places - OPTIMIZED
   useEffect(() => {
     // Always fetch places on initial mount to show all places
     if (isInitialMount.current) {
@@ -330,10 +330,13 @@ const Places = () => {
       const fetchInitialPlaces = async () => {
         setLoading(true);
         try {
-          const res = await fetch(`${BASE_URL}/api/place`);
+          const res = await fetch(`${BASE_URL}/api/place?limit=30&page=1`);
           if (res.ok) {
             const data = await res.json();
             setPlaces(data.data || []);
+            setTotalPages(data.pages || 1);
+            setCurrentPage(1);
+            setHasMore(data.page < data.pages);
           }
         } catch (err) {
           console.error("Initial fetch error:", err);
@@ -361,13 +364,19 @@ const Places = () => {
     prevFilters.current = currentFilters;
     isInitialMount.current = false;
 
+    // Reset pagination when filters change
+    setCurrentPage(1);
+
     const fetchPlaces = async () => {
       setLoading(true);
       setError("");
 
       try {
-        let url = `${BASE_URL}/api/place?`;
+        let url = `${BASE_URL}/api/place?limit=30&page=1`;
         const params = new URLSearchParams();
+        
+        params.append('limit', '30');
+        params.append('page', '1');
 
         if (searchQuery) params.append("search", searchQuery);
         if (selectedCity !== "all") {
@@ -399,7 +408,7 @@ const Places = () => {
           params.append("radius", radius);
         }
 
-        url += params.toString();
+        url = `${BASE_URL}/api/place?${params.toString()}`;
         console.log("Fetching places from:", url);
         console.log("Selected city:", selectedCity);
         console.log("Params:", params.toString());
@@ -411,6 +420,9 @@ const Places = () => {
         console.log("Places API response:", data);
         console.log("Places found:", data.data?.length || 0);
         setPlaces(data.data || []);
+        setTotalPages(data.pages || 1);
+        setCurrentPage(1);
+        setHasMore(data.page < data.pages);
       } catch (err) {
         setError("Failed to load places. Please try again later.");
         console.error("Fetch error:", err);
@@ -573,6 +585,62 @@ const Places = () => {
 
   const truncateDescription = (text, maxLength) =>
     text?.length > maxLength ? `${text.substring(0, maxLength)}...` : text || "";
+
+  // Load more places function
+  const loadMorePlaces = async () => {
+    if (loadingMore || !hasMore) return;
+    
+    setLoadingMore(true);
+    try {
+      const nextPage = currentPage + 1;
+      let url = `${BASE_URL}/api/place?limit=30&page=${nextPage}`;
+      const params = new URLSearchParams();
+      
+      params.append('limit', '30');
+      params.append('page', nextPage.toString());
+
+      if (searchQuery) params.append("search", searchQuery);
+      if (selectedCity !== "all") {
+        const cityQueryMap = {
+          kathmandu: "Kathmandu",
+          lalitpur: "Lalitpur",
+          bhaktapur: "Bhaktapur",
+          pokhara: "Pokhara",
+          janakpur: "Janakpur",
+          chitwan: "Chitwan",
+          lumbini: "Lumbini",
+          nagarkot: "Nagarkot",
+          bandipur: "Bandipur",
+          gorkha: "Gorkha",
+          mustang: "Mustang",
+          everest: "Everest Region",
+        };
+        const cityName = cityQueryMap[selectedCity] || (selectedCity.charAt(0).toUpperCase() + selectedCity.slice(1));
+        params.append("city", cityName);
+      }
+      if (selectedCategory !== "all") params.append("category", selectedCategory);
+      
+      if (useLocation && userLocation) {
+        params.append("lat", userLocation.lat);
+        params.append("lng", userLocation.lng);
+        params.append("radius", radius);
+      }
+
+      url = `${BASE_URL}/api/place?${params.toString()}`;
+      
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+
+      const data = await res.json();
+      setPlaces(prev => [...prev, ...(data.data || [])]);
+      setCurrentPage(nextPage);
+      setHasMore(data.page < data.pages);
+    } catch (err) {
+      console.error("Load more error:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   return (
     <>
@@ -752,7 +820,8 @@ const Places = () => {
                     </button>
                   </div>
                 ) : (
-                  filteredPlaces.map((place) => (
+                  filteredPlaces.map((place) => {
+                    return (
                     <div
                       key={place._id}
                       className="place-card"
@@ -761,7 +830,7 @@ const Places = () => {
                     >
                       <div className="image-container">
                         <img
-                          src={getImageUrl(place.img)}
+                          src={place.img || '/images/placeholder.jpg'}
                           alt={place.name}
                           className="place-image"
                           onError={(e) => {
@@ -844,9 +913,30 @@ const Places = () => {
                         )}
                       </div>
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
+              
+              {/* Load More Button */}
+              {!loading && hasMore && filteredPlaces.length > 0 && (
+                <div className="load-more-container">
+                  <button 
+                    className="load-more-btn"
+                    onClick={loadMorePlaces}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? (
+                      <>
+                        <div className="loader-small"></div>
+                        Loading more places...
+                      </>
+                    ) : (
+                      'Load More Places'
+                    )}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
