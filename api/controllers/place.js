@@ -75,16 +75,34 @@ export const getAllPlaces = async (req, res) => {
         }
 
         const skip = (page - 1) * limit;
-        const total = await Place.countDocuments(query);
+        
+        // For geospatial queries, we can't use countDocuments with $near
+        // So we'll get the total differently
+        let total;
+        if (lat && lng && radius) {
+            // For geospatial queries, get total without pagination first
+            const allNearbyPlaces = await Place.find(query)
+                .select('_id')
+                .lean()
+                .exec();
+            total = allNearbyPlaces.length;
+        } else {
+            total = await Place.countDocuments(query);
+        }
         
         // Select only necessary fields for list view - reduces data transfer
-        const places = await Place.find(query)
+        let placesQuery = Place.find(query)
             .select('name description category city location img entranceFee popularityScore avgVisitMins')
-            .sort(search ? { score: { $meta: 'textScore' } } : sort)
             .limit(+limit)
             .skip(skip)
-            .lean()
-            .exec();
+            .lean();
+        
+        // Only add sort if not using geospatial query (can't sort with $near)
+        if (!(lat && lng && radius)) {
+            placesQuery = placesQuery.sort(search ? { score: { $meta: 'textScore' } } : sort);
+        }
+        
+        const places = await placesQuery.exec();
 
         res.status(200).json({
             success: true,
