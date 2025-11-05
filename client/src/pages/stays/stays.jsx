@@ -12,10 +12,32 @@ import { DateRange } from "react-date-range";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { SearchContext } from "../../context/SearchContext";
+import { Heart, Star, MapPin, Map, Plane, CheckCircle, XCircle, RefreshCw, Home as HomeIcon } from "lucide-react";
 import "./stays.css";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
 import useFetch from "../../hooks/useFetch";
+
+const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8800";
+
+// Star Rating Component
+const StarRating = ({ rating, size = 16 }) => {
+  if (rating === null || rating === undefined) return null;
+  
+  return (
+    <div className="star-rating">
+      {[...Array(5)].map((_, index) => (
+        <Star
+          key={index}
+          size={size}
+          fill={index < Math.floor(rating) ? "currentColor" : "none"}
+          color={index < Math.floor(rating) ? "#FFD700" : "#ccc"}
+        />
+      ))}
+      <span className="rating-text">({rating.toFixed(1)})</span>
+    </div>
+  );
+};
 
 const Stays = () => {
     const [destination, setDestination] = useState("");
@@ -36,12 +58,37 @@ const Stays = () => {
     const [min, setMin] = useState(0);
     const [max, setMax] = useState(1000);
     const [selectedCategory, setSelectedCategory] = useState("all");
+    const [showSearchResults, setShowSearchResults] = useState(false);
+    const [searchUrl, setSearchUrl] = useState("");
+    const [favorites, setFavorites] = useState(new Set());
+    const [hotelReviews, setHotelReviews] = useState({});
 
     const dateRef = useRef();
     const optionsRef = useRef();
+    const resultsRef = useRef();
+    const refinedDateRef = useRef(); // Separate ref for refined search date picker
+    const [openRefinedDate, setOpenRefinedDate] = useState(false); // Separate state for refined search
 
     const { dispatch } = useContext(SearchContext);
     const navigate = useNavigate();
+
+    // Build search URL with all filters
+    const buildSearchUrl = (dest, minPrice, maxPrice, category) => {
+        let url = `${BASE_URL}/api/hotels?`;
+        const params = new URLSearchParams();
+        
+        if (dest) params.append("city", dest);
+        if (minPrice) params.append("min", minPrice);
+        if (maxPrice) params.append("max", maxPrice);
+        if (category && category !== "all") params.append("type", category);
+        
+        return url + params.toString();
+    };
+
+    // Fetch search results
+    const { data: searchResults, loading: searchLoading, error: searchError } = useFetch(
+        showSearchResults ? searchUrl : null
+    );
 
     // Stay categories with icons and descriptions
     const stayCategories = [
@@ -91,16 +138,55 @@ const Stays = () => {
 
     // Fetch featured properties
     const { data: featuredData, loading: featuredLoading } = useFetch(
-        "  http://localhost:8800/api/hotels?featured=true&limit=4"
+        `${BASE_URL}/api/hotels?featured=true&limit=4`
     );
 
     // Fetch property list counts
-    const { data: propertyListData } = useFetch("http://localhost:8800/api/hotels/countByType");
+    const { data: propertyListData } = useFetch(`${BASE_URL}/api/hotels/countByType`);
+
+    // Fetch reviews for all hotels
+    useEffect(() => {
+        const fetchReviews = async () => {
+            try {
+                const reviewsResponse = await fetch(`${BASE_URL}/api/review/`);
+                if (reviewsResponse.ok) {
+                    const reviewsData = await reviewsResponse.json();
+                    
+                    let allReviews = [];
+                    if (Array.isArray(reviewsData)) {
+                        allReviews = reviewsData;
+                    } else if (reviewsData.data && Array.isArray(reviewsData.data)) {
+                        allReviews = reviewsData.data;
+                    }
+                    
+                    const reviewsByHotel = {};
+                    allReviews.forEach(review => {
+                        if (review.reviewedItem && review.reviewedModel === "Hotel") {
+                            const hotelId = review.reviewedItem._id;
+                            if (!reviewsByHotel[hotelId]) {
+                                reviewsByHotel[hotelId] = [];
+                            }
+                            reviewsByHotel[hotelId].push(review);
+                        }
+                    });
+                    
+                    setHotelReviews(reviewsByHotel);
+                }
+            } catch (error) {
+                console.error("Error fetching reviews:", error);
+            }
+        };
+
+        fetchReviews();
+    }, []);
 
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (dateRef.current && !dateRef.current.contains(e.target)) {
                 setOpenDate(false);
+            }
+            if (refinedDateRef.current && !refinedDateRef.current.contains(e.target)) {
+                setOpenRefinedDate(false);
             }
             if (optionsRef.current && !optionsRef.current.contains(e.target)) {
                 setOpenOptions(false);
@@ -137,15 +223,34 @@ const Stays = () => {
             }
         });
 
-        navigate("/hotels", {
-            state: {
-                destination,
-                dates,
-                options,
-                min,
-                max
-            }
-        });
+        // Show search results on the same page instead of navigating
+        const url = buildSearchUrl(destination, min, max, selectedCategory);
+        setSearchUrl(url);
+        setShowSearchResults(true);
+        
+        // Scroll to results
+        setTimeout(() => {
+            resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    };
+
+    const toggleFavorite = (id) => {
+        const newFavorites = new Set(favorites);
+        if (newFavorites.has(id)) {
+            newFavorites.delete(id);
+        } else {
+            newFavorites.add(id);
+        }
+        setFavorites(newFavorites);
+    };
+
+    // Calculate average rating for a hotel
+    const getHotelRating = (hotelId) => {
+        const reviews = hotelReviews[hotelId];
+        if (!reviews || reviews.length === 0) return null;
+        
+        const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+        return totalRating / reviews.length;
     };
 
     const handleKeyPress = (e) => {
@@ -157,17 +262,15 @@ const Stays = () => {
     const handleCategoryClick = (categoryId) => {
         setSelectedCategory(categoryId);
         
-        // Navigate to hotels page with category filter
-        navigate("/hotels", {
-            state: {
-                destination: "",
-                dates: dates,
-                options: options,
-                min: min,
-                max: max,
-                category: categoryId
-            }
-        });
+        // Show filtered results on same page instead of navigating
+        const url = buildSearchUrl(destination, min, max, categoryId);
+        setSearchUrl(url);
+        setShowSearchResults(true);
+        
+        // Scroll to results
+        setTimeout(() => {
+            resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
     };
 
     return (
@@ -268,6 +371,258 @@ const Stays = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Search Results Section */}
+            {showSearchResults && (
+                <div className="searchResultsSection" ref={resultsRef}>
+                    <div className="resultsContainer">
+                        {/* Refined Search Panel */}
+                        <div className="refinedSearchPanel">
+                            <div className="searchPanelHeader">
+                                <h3>Refine your search</h3>
+                                <p>Find the perfect accommodation for your trip</p>
+                                <button 
+                                    className="clearSearchBtn"
+                                    onClick={() => setShowSearchResults(false)}
+                                >
+                                    ← Back to Browse
+                                </button>
+                            </div>
+
+                            <div className="searchFilters">
+                                <div className="filterGroup">
+                                    <label>
+                                        <FontAwesomeIcon icon={faBed} className="filterIcon" />
+                                        Destination
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={destination}
+                                        onChange={(e) => setDestination(e.target.value)}
+                                        placeholder="City or property name"
+                                        className="modernInput"
+                                    />
+                                </div>
+
+                                <div className="filterGroup" ref={refinedDateRef}>
+                                    <label>
+                                        <FontAwesomeIcon icon={faCalendarDays} className="filterIcon" />
+                                        Dates
+                                    </label>
+                                    <div
+                                        className="dateDisplay"
+                                        onClick={() => setOpenRefinedDate(!openRefinedDate)}
+                                    >
+                                        {`${format(dates[0].startDate, "MMM dd")} - ${format(dates[0].endDate, "MMM dd")}`}
+                                    </div>
+                                    {openRefinedDate && (
+                                        <div className="datePickerWrapper">
+                                            <DateRange
+                                                editableDateInputs={true}
+                                                onChange={(item) => setDates([item.selection])}
+                                                moveRangeOnFirstSelection={false}
+                                                ranges={dates}
+                                                minDate={new Date()}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="filterGroup">
+                                    <label>
+                                        <FontAwesomeIcon icon={faMagnifyingGlass} className="filterIcon" />
+                                        Price range
+                                    </label>
+                                    <div className="priceRangeInputs">
+                                        <input
+                                            type="number"
+                                            value={min}
+                                            onChange={(e) => setMin(e.target.value)}
+                                            placeholder="Min"
+                                            className="modernInput"
+                                        />
+                                        <span className="rangeSeparator">→</span>
+                                        <input
+                                            type="number"
+                                            value={max}
+                                            onChange={(e) => setMax(e.target.value)}
+                                            placeholder="Max"
+                                            className="modernInput"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="filterGroup">
+                                    <label>
+                                        <FontAwesomeIcon icon={faHome} className="filterIcon" />
+                                        Property Type
+                                    </label>
+                                    <select
+                                        value={selectedCategory}
+                                        onChange={(e) => setSelectedCategory(e.target.value)}
+                                        className="modernInput"
+                                    >
+                                        <option value="all">All Types</option>
+                                        <option value="hotel">Hotels</option>
+                                        <option value="resort">Resorts</option>
+                                        <option value="guesthouse">Guesthouses</option>
+                                        <option value="homestay">Homestays</option>
+                                        <option value="apartment">Apartments</option>
+                                        <option value="villa">Villas</option>
+                                    </select>
+                                </div>
+
+                                <div className="filterGroup">
+                                    <label>
+                                        <FontAwesomeIcon icon={faPerson} className="filterIcon" />
+                                        Guests & Rooms
+                                    </label>
+                                    <div className="guestSummary">
+                                        {options.adult} adults • {options.children} children • {options.room} rooms
+                                    </div>
+                                </div>
+
+                                <button className="updateSearchButton" onClick={() => {
+                                    const url = buildSearchUrl(destination, min, max, selectedCategory);
+                                    setSearchUrl(url);
+                                }}>
+                                    <FontAwesomeIcon icon={faMagnifyingGlass} />
+                                    Update results
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Results Section */}
+                        <div className="resultsSection">
+                            <div className="resultsHeader">
+                                <h2>
+                                    {destination ? (
+                                        <>Stays in <span className="highlight">{destination}</span></>
+                                    ) : selectedCategory !== "all" ? (
+                                        <>Showing <span className="highlight">{selectedCategory}s</span></>
+                                    ) : (
+                                        "Available Properties"
+                                    )}
+                                </h2>
+                                <p className="resultsCount">{searchResults?.length || 0} properties found</p>
+                            </div>
+
+                        {searchLoading ? (
+                            <div className="loadingState">
+                                <div className="loadingSpinner"></div>
+                                <p>Discovering amazing stays...</p>
+                            </div>
+                        ) : searchError ? (
+                            <div className="errorState">
+                                <XCircle size={48} className="errorIcon" />
+                                <p>We couldn't load properties. Please try again.</p>
+                                <button onClick={handleSearch} className="retryButton">
+                                    <RefreshCw size={16} />
+                                    Retry
+                                </button>
+                            </div>
+                        ) : searchResults && searchResults.length > 0 ? (
+                            <div className="hotelsGrid">
+                                {searchResults.map((hotel) => {
+                                    const reviews = hotelReviews[hotel._id] || [];
+                                    const averageRating = getHotelRating(hotel._id);
+                                    const reviewCount = reviews.length;
+                                    
+                                    return (
+                                        <div className="hotelCard" key={hotel._id}>
+                                            <div className="hotelImageContainer">
+                                                <img
+                                                    src={hotel.photos?.[0] || "/placeholder-hotel.jpg"}
+                                                    alt={hotel.name}
+                                                    className="hotelImage"
+                                                />
+                                                <button
+                                                    className={`favoriteButton ${favorites.has(hotel._id) ? "active" : ""}`}
+                                                    onClick={() => toggleFavorite(hotel._id)}
+                                                >
+                                                    <Heart size={18} fill={favorites.has(hotel._id) ? "currentColor" : "none"} />
+                                                </button>
+                                                {hotel.featured && (
+                                                    <div className="featuredBadge">
+                                                        <Star size={12} fill="currentColor" />
+                                                        Featured
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="hotelDetails">
+                                                <div className="hotelInfo">
+                                                    <h3>{hotel.name}</h3>
+                                                    <div className="location">
+                                                        <MapPin size={14} />
+                                                        <span>{hotel.city}</span>
+                                                    </div>
+                                                    
+                                                    {/* Rating Section */}
+                                                    <div className="rating-section">
+                                                        {averageRating !== null ? (
+                                                            <div className="rating-badge">
+                                                                <StarRating rating={averageRating} size={14} />
+                                                                <span className="review-count">
+                                                                    {reviewCount} review{reviewCount !== 1 ? 's' : ''}
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="rating-badge">
+                                                                <span className="no-rating">No reviews yet</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    <div className="amenities">
+                                                        {hotel.distance && (
+                                                            <span>
+                                                                <Map size={12} />
+                                                                {hotel.distance}m from center
+                                                            </span>
+                                                        )}
+                                                        {hotel.free_airport_taxi && (
+                                                            <span>
+                                                                <Plane size={12} />
+                                                                Free airport taxi
+                                                            </span>
+                                                        )}
+                                                        {hotel.free_cancellation && (
+                                                            <span>
+                                                                <CheckCircle size={12} />
+                                                                Free cancellation
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="description">{hotel.desc?.substring(0, 120)}...</p>
+                                                </div>
+                                                <div className="hotelPricing">
+                                                    <div className="price">
+                                                        <span className="amount">Rs. {hotel.cheapestPrice}</span>
+                                                        <span className="perNight">/ night</span>
+                                                    </div>
+                                                    <button
+                                                        className="viewButton"
+                                                        onClick={() => navigate(`/hotels/${hotel._id}`)}
+                                                    >
+                                                        View Details
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <div className="emptyState">
+                                <HomeIcon size={48} className="emptyIcon" />
+                                <h3>No properties match your search</h3>
+                                <p>Try adjusting your filters or search in a different area</p>
+                            </div>
+                        )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="stayContainer">
                 <h1 className="sectionTitle">Browse by Cities</h1>

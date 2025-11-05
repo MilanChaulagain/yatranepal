@@ -231,7 +231,7 @@ export default function Planner() {
               {filteredPlaces.map(p => (
                 <label key={p._id} className={`place-card ${selectedPlaceIds.has(p._id) ? 'selected' : ''}`}>
                   <input type="checkbox" checked={selectedPlaceIds.has(p._id)} onChange={()=>togglePlace(p._id)} />
-                  <img className="place-thumb" src={getEntityImage(p)} alt={p.name} loading="lazy" onError={(e)=>{ e.currentTarget.src = PLACE_IMG_FALLBACK; }} />
+                  <img className="place-thumb" src={getEntityImage(p)} alt={p.name} onError={(e)=>{ e.currentTarget.src = PLACE_IMG_FALLBACK; }} />
                   <span>
                     <div className="place-name">{p.name}</div>
                     <div className="place-sub">{p.city} • {p.address}</div>

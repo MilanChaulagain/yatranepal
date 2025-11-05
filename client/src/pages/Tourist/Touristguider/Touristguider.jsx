@@ -5,8 +5,10 @@ import Navbar from "../../../components/navbar/Navbar";
 import Footer from "../../../components/footer/Footer";
 import { useNavigate } from "react-router-dom";
 
+const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8800";
+
 // Add this license number pattern validation
-const licenseNumberPattern = /^[A-Z0-9]+$/; // Allows uppercase letters, numbers, and hyphens
+const licenseNumberPattern = /^[A-Z0-9]+$/; // Allows uppercase letters and numbers
 
 const categoryOptions = [
     "Adventure",
@@ -61,15 +63,28 @@ const TouristGuideForm = () => {
     };
     const uploadToCloudinary = async () => {
         if (!imageFile) return "";
+        
+        const CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME;
+        const UPLOAD_PRESET = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET;
+
+        if (!CLOUD_NAME || !UPLOAD_PRESET) {
+            throw new Error("Image upload is not configured. Please set REACT_APP_CLOUDINARY_CLOUD_NAME and REACT_APP_CLOUDINARY_UPLOAD_PRESET.");
+        }
+
         const data = new FormData();
         data.append("file", imageFile);
-        data.append("", "");
+        data.append("upload_preset", UPLOAD_PRESET);
 
-        const res = await axios.post(
-            data
-        );
-
-        return res.data.secure_url;
+        try {
+            const res = await axios.post(
+                `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+                data
+            );
+            return res.data.secure_url;
+        } catch (error) {
+            console.error("Cloudinary upload error:", error);
+            throw new Error("Failed to upload image");
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -97,7 +112,7 @@ const TouristGuideForm = () => {
                 image: imageUrl,
             };
 
-            await axios.post("http://localhost:8800/api/touristguide/register", payload, {
+            await axios.post(`${BASE_URL}/api/touristguide/register`, payload, {
                 withCredentials: true,
             });
 

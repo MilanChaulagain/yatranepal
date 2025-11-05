@@ -36,7 +36,6 @@ const DemoTripCard = ({ trip, onSelect }) => (
           className="demoTripThumb"
           src={getEntityImage(p)}
           alt={p.name}
-          loading="lazy"
           onError={(e) => {
             e.currentTarget.src = PLACE_IMG_FALLBACK;
           }}
