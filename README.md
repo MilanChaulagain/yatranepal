@@ -1,4 +1,4 @@
-# yatranepalv2
+# yatranepal
 
 🌏 YatraNepal – Discover Nepal Like Never Before
 
