@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Heart, Navigation, ArrowLeft, Info, Calendar, Users, Star } from "lucide-react";
+import { Heart, Navigation, ArrowLeft, Info, Calendar, Users, Star, MapPin } from "lucide-react";
 import useFetch from "../../hooks/useFetch";
 import "./hotelDetails.css";
 import Navbar from "../../components/navbar/Navbar";
@@ -238,6 +238,21 @@ const HotelDetails = () => {
               </div>
             )}
           </div>
+          <div className="location-section">
+            <MapPin size={18} />
+            <span>{data.address || `${data.city}, ${data.type}`}</span>
+            {((data.location?.coordinates && data.location.coordinates.length === 2) || 
+              (data.latitude && data.longitude)) && (
+              <button 
+                className="directions-button"
+                onClick={handleGetDirections}
+                title="Get directions to this hotel"
+              >
+                <Navigation size={16} />
+                <span>Get Directions</span>
+              </button>
+            )}
+          </div>
           <span className="hotelDetails-type">{data.type}</span>
           <span className="hotelDetails-city">{data.city}</span>
           {data.cheapestPrice && (
@@ -253,14 +268,6 @@ const HotelDetails = () => {
           >
             <Heart size={20} fill={isFavorite ? "currentColor" : "none"} />
             {isFavorite ? "Saved" : "Save"}
-          </button>
-          <button
-            className="directions-button-detail"
-            onClick={handleGetDirections}
-            aria-label="Get directions to this hotel"
-          >
-            <Navigation size={20} />
-            Get Directions
           </button>
         </div>
 

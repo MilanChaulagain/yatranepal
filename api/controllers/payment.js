@@ -120,6 +120,15 @@ export const initiateEsewaPayment = async (req, res) => {
         const amount = reservation.totalPrice;
         const transactionUuid = `${reservation._id}-${Date.now()}`;
 
+        // Check if eSewa credentials are configured
+        if (!process.env.ESEWA_MERCHANT_CODE || !process.env.ESEWA_SECRET_KEY || !process.env.ESEWA_BASE_URL) {
+            console.error("eSewa credentials not configured in .env file");
+            return res.status(500).json({ 
+                success: false, 
+                message: "eSewa payment is not configured. Please contact support." 
+            });
+        }
+
         const esewaConfig = {
             amount: amount.toString(),
             tax_amount: "0",
@@ -135,6 +144,8 @@ export const initiateEsewaPayment = async (req, res) => {
 
         const signatureString = `total_amount=${esewaConfig.total_amount},transaction_uuid=${esewaConfig.transaction_uuid},product_code=${esewaConfig.product_code}`;
         const signature = generateEsewaSignature(process.env.ESEWA_SECRET_KEY, signatureString);
+
+        console.log("eSewa payment initiated for reservation:", reservationId);
 
         return res.status(200).json({
             success: true,
@@ -229,18 +240,29 @@ export const initiateKhaltiPayment = async (req, res) => {
             });
         }
 
+        // Check if Khalti credentials are configured
+        if (!process.env.KHALTI_SECRET_KEY || !process.env.KHALTI_BASE_URL) {
+            console.error("Khalti credentials not configured in .env file");
+            return res.status(500).json({ 
+                success: false, 
+                message: "Khalti payment is not configured. Please contact support." 
+            });
+        }
+
         const payload = {
-            return_url: `${process.env.BACKEND_URL}/api/payment/khalti/verify?reservationId=${reservationId}`,
-            website_url: process.env.FRONTEND_URL,
+            return_url: `${process.env.BACKEND_URL}/api/payment/khalti/verify`,
+            website_url: process.env.FRONTEND_URL || "http://localhost:3000",
             amount: Math.round(reservation.totalPrice * 100), // Convert to paisa
             purchase_order_id: reservationId,
-            purchase_order_name: `Hotel_Reservation_${reservationId}`,
+            purchase_order_name: `Hotel_Reservation_${reservationId.substring(0, 8)}`,
             customer_info: {
-                name: reservation.userId.username || "Customer",
-                email: reservation.userId.email || "customer@example.com",
-                phone: reservation.userId.phone || "9800000000",
+                name: reservation.userId?.username || "Customer",
+                email: reservation.userId?.email || "customer@example.com",
+                phone: reservation.userId?.phone || "9800000000",
             },
         };
+
+        console.log("Khalti payment initiation payload:", JSON.stringify(payload, null, 2));
 
         const response = await axios.post(
             `${process.env.KHALTI_BASE_URL}/epayment/initiate/`,
@@ -252,6 +274,8 @@ export const initiateKhaltiPayment = async (req, res) => {
                 },
             }
         );
+
+        console.log("Khalti response:", response.data);
 
         // Save pidx to reservation
         reservation.pidx = response.data.pidx;
@@ -266,7 +290,8 @@ export const initiateKhaltiPayment = async (req, res) => {
         console.error("Error in initiateKhaltiPayment:", error.response?.data || error.message);
         res.status(500).json({ 
             success: false, 
-            message: "Failed to initiate Khalti payment" 
+            message: error.response?.data?.detail || "Failed to initiate Khalti payment",
+            error: error.response?.data || error.message
         });
     }
 };
@@ -274,36 +299,55 @@ export const initiateKhaltiPayment = async (req, res) => {
 // ✅ Verify Khalti Payment
 export const verifyKhaltiPayment = async (req, res) => {
     try {
-        const { pidx, transaction_id, purchase_order_id } = req.query;
-        const reservationId = purchase_order_id;
+        const { pidx, txnId, amount, mobile, purchase_order_id, purchase_order_name, transaction_id } = req.query;
+        
+        // Get reservationId from purchase_order_id or query params
+        const reservationId = purchase_order_id || req.query.reservationId;
+
+        console.log("Khalti verification query params:", req.query);
 
         if (!reservationId) {
+            console.error("No reservation ID in Khalti callback");
             return res.redirect(`${process.env.FRONTEND_URL}/payment-failure?error=no_reservation_id&gateway=khalti`);
+        }
+
+        if (!pidx) {
+            console.error("No pidx in Khalti callback");
+            return res.redirect(`${process.env.FRONTEND_URL}/payment-failure?error=no_pidx&gateway=khalti&reservationId=${reservationId}`);
         }
 
         const reservation = await Reservation.findById(reservationId);
         if (!reservation) {
+            console.error("Reservation not found:", reservationId);
             return res.redirect(`${process.env.FRONTEND_URL}/payment-failure?error=reservation_not_found&gateway=khalti`);
         }
 
         // Verify payment with Khalti
+        const verifyUrl = `${process.env.KHALTI_BASE_URL}/epayment/lookup/`;
+        console.log("Verifying with Khalti:", verifyUrl);
+
         const response = await axios.post(
-            process.env.KHALTI_VERIFY_URL,
+            verifyUrl,
             { pidx },
             {
                 headers: {
                     Authorization: `Key ${process.env.KHALTI_SECRET_KEY}`,
+                    "Content-Type": "application/json",
                 },
             }
         );
+
+        console.log("Khalti verification response:", response.data);
 
         if (response.data.status === "Completed") {
             // Payment successful
             reservation.paymentStatus = "success";
             reservation.status = "confirmed";
             reservation.paymentMethod = "khalti";
-            reservation.transactionId = transaction_id || pidx;
+            reservation.transactionId = transaction_id || txnId || pidx;
             await reservation.save();
+
+            console.log("Payment successful, updating rooms...");
 
             // Update room availability
             for (const { roomId, number } of reservation.roomDetails) {
@@ -313,23 +357,29 @@ export const verifyKhaltiPayment = async (req, res) => {
                 );
             }
 
+            console.log("Redirecting to success page");
             return res.redirect(`${process.env.FRONTEND_URL}/payment-success?status=success&reservationId=${reservationId}&gateway=khalti`);
         } else {
-            // Payment failed
+            // Payment failed or pending
+            console.log("Payment not completed, status:", response.data.status);
             reservation.paymentStatus = "failed";
             await reservation.save();
-            return res.redirect(`${process.env.FRONTEND_URL}/payment-failure?status=failed&reservationId=${reservationId}&gateway=khalti`);
+            return res.redirect(`${process.env.FRONTEND_URL}/payment-failure?status=${response.data.status}&reservationId=${reservationId}&gateway=khalti`);
         }
     } catch (error) {
         console.error("Error in verifyKhaltiPayment:", error.response?.data || error.message);
         
         // Try to get reservationId from query or error data
-        const reservationId = req.query.purchase_order_id;
+        const reservationId = req.query.purchase_order_id || req.query.reservationId;
         if (reservationId) {
             // Mark payment as failed
-            await Reservation.findByIdAndUpdate(reservationId, {
-                paymentStatus: "failed"
-            });
+            try {
+                await Reservation.findByIdAndUpdate(reservationId, {
+                    paymentStatus: "failed"
+                });
+            } catch (updateError) {
+                console.error("Failed to update reservation:", updateError);
+            }
         }
         
         return res.redirect(`${process.env.FRONTEND_URL}/payment-failure?error=verification_failed&gateway=khalti${reservationId ? `&reservationId=${reservationId}` : ''}`);

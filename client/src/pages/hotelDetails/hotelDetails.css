@@ -34,6 +34,16 @@
   gap: 1rem;
   margin-bottom: 24px;
 }
+
+.location-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #64748b;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
 .favorite-button,
 .directions-button {
   display: inline-flex;
@@ -64,13 +74,25 @@
 .directions-button-detail {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  box-shadow: 0 10px 25px -5px rgba(102, 126, 234, 0.3);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  margin-left: auto;
 }
 
 .directions-button:hover:not(:disabled),
 .directions-button-detail:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 20px 40px -10px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.directions-button:active,
+.directions-button-detail:active {
+  transform: translateY(0);
 }
 
 .directions-button:disabled,
