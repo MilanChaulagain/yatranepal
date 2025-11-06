@@ -187,10 +187,10 @@
     color: #0f172a;
     border: none;
     border-radius: 8px;
-    padding: 0.5rem 0.9rem;
-    font-weight: 600;
+    padding: 0.4rem 0.6rem;
+    font-weight: 400;
     cursor: pointer;
-    transition: background 0.2s;
+    /* transition: background 0.2s; */
 }
 .edit-btn:hover {
     background: #e2e8f0;

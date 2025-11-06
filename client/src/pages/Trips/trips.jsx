@@ -184,7 +184,7 @@ export default function Trips() {
                             <option value="start-asc">Start date ↑</option>
                             <option value="start-desc">Start date ↓</option>
                         </select>
-                        <button className="create-trip-btn" onClick={() => setShowCreate(true)}>Create New Trip</button>
+                        <button className="create-trip-btn" onClick={() => navigate('/trips/plan')}>Create New Trip</button>
                     </div>
                 </div>
                 {showCreate && (
