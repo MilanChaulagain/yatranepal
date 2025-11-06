@@ -12,7 +12,7 @@ import { DateRange } from "react-date-range";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { SearchContext } from "../../context/SearchContext";
-import { Heart, Star, MapPin, Map, Plane, CheckCircle, XCircle, RefreshCw, Home as HomeIcon } from "lucide-react";
+import { Heart, Star, MapPin, Map, Plane, CheckCircle, XCircle, RefreshCw, Home as HomeIcon, Navigation } from "lucide-react";
 import "./stays.css";
 import "react-date-range/dist/styles.css";
 import "react-date-range/dist/theme/default.css";
@@ -62,6 +62,7 @@ const Stays = () => {
     const [searchUrl, setSearchUrl] = useState("");
     const [favorites, setFavorites] = useState(new Set());
     const [hotelReviews, setHotelReviews] = useState({});
+    const [userLocation, setUserLocation] = useState(null);
 
     const dateRef = useRef();
     const optionsRef = useRef();
@@ -71,6 +72,28 @@ const Stays = () => {
 
     const { dispatch } = useContext(SearchContext);
     const navigate = useNavigate();
+
+    // Get user's location for directions
+    useEffect(() => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    setUserLocation({
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                    });
+                },
+                (error) => {
+                    console.log("Location access denied or unavailable:", error);
+                },
+                {
+                    enableHighAccuracy: false,
+                    timeout: 10000,
+                    maximumAge: 300000 // Cache for 5 minutes
+                }
+            );
+        }
+    }, []);
 
     // Build search URL with all filters
     const buildSearchUrl = (dest, minPrice, maxPrice, category) => {
@@ -242,6 +265,23 @@ const Stays = () => {
             newFavorites.add(id);
         }
         setFavorites(newFavorites);
+    };
+
+    const handleViewMap = (lat, lng) => {
+        if (!lat || !lng) {
+            alert("Location coordinates not available for this hotel.");
+            return;
+        }
+
+        if (userLocation) {
+            // If user location is available, show directions
+            const url = `https://www.google.com/maps/dir/?api=1&origin=${userLocation.lat},${userLocation.lng}&destination=${lat},${lng}&travelmode=driving&zoom=15`;
+            window.open(url, "_blank", "noopener,noreferrer");
+        } else {
+            // If no user location, show the hotel directly with a marker
+            const url = `https://www.google.com/maps/place/${lat},${lng}/@${lat},${lng},15z`;
+            window.open(url, "_blank", "noopener,noreferrer");
+        }
     };
 
     // Calculate average rating for a hotel
@@ -555,6 +595,21 @@ const Stays = () => {
                                                     <div className="location">
                                                         <MapPin size={14} />
                                                         <span>{hotel.city}</span>
+                                                        {((hotel.location?.coordinates && hotel.location.coordinates.length === 2) || 
+                                                          (hotel.latitude && hotel.longitude)) && (
+                                                            <button 
+                                                                className="directions-btn-small"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    const lat = hotel.location?.coordinates?.[1] || hotel.latitude;
+                                                                    const lng = hotel.location?.coordinates?.[0] || hotel.longitude;
+                                                                    handleViewMap(lat, lng);
+                                                                }}
+                                                                title="Get directions to this hotel"
+                                                            >
+                                                                <Navigation size={14} />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                     
                                                     {/* Rating Section */}

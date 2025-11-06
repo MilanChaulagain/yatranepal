@@ -362,7 +362,7 @@ const MoneyExchange = () => {
                     <input
                         type="range"
                         min="1"
-                        max="20"
+                        max="30"
                         value={radius}
                         onChange={(e) => setRadius(Number(e.target.value))}
                         className="radius-slider"

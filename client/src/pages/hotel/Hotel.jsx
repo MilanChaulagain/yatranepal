@@ -24,7 +24,8 @@ import {
   Coffee,
   Dumbbell,
   ParkingCircle,
-  Utensils
+  Utensils,
+  Navigation
 } from "lucide-react";
 
 const BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8800";
@@ -61,6 +62,29 @@ const Hotel = () => {
   const [reviews, setReviews] = useState([]);
   const [averageRating, setAverageRating] = useState(null);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+
+  // Get user's location for directions
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.log("Location access denied or unavailable:", error);
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 300000 // Cache for 5 minutes
+        }
+      );
+    }
+  }, []);
 
   // Fetch reviews for this hotel
   useEffect(() => {
@@ -159,6 +183,23 @@ const Hotel = () => {
     }
   };
 
+  const handleViewMap = (lat, lng) => {
+    if (!lat || !lng) {
+      alert("Location coordinates not available for this hotel.");
+      return;
+    }
+
+    if (userLocation) {
+      // If user location is available, show directions
+      const url = `https://www.google.com/maps/dir/?api=1&origin=${userLocation.lat},${userLocation.lng}&destination=${lat},${lng}&travelmode=driving&zoom=15`;
+      window.open(url, "_blank", "noopener,noreferrer");
+    } else {
+      // If no user location, show the hotel directly with a marker
+      const url = `https://www.google.com/maps/place/${lat},${lng}/@${lat},${lng},15z`;
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  };
+
   return (
     <div className="hotel-page">
       <Navbar />
@@ -220,6 +261,21 @@ const Hotel = () => {
               <div className="location-section">
                 <MapPin size={18} />
                 <span>{data.address}</span>
+                {((data.location?.coordinates && data.location.coordinates.length === 2) || 
+                  (data.latitude && data.longitude)) && (
+                  <button 
+                    className="directions-button"
+                    onClick={() => {
+                      const lat = data.location?.coordinates?.[1] || data.latitude;
+                      const lng = data.location?.coordinates?.[0] || data.longitude;
+                      handleViewMap(lat, lng);
+                    }}
+                    title="Get directions to this hotel"
+                  >
+                    <Navigation size={16} />
+                    <span>Get Directions</span>
+                  </button>
+                )}
               </div>
               <div className="highlight-badges">
                 <div className="highlight-badge">

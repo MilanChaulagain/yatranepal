@@ -166,26 +166,48 @@ const HotelDetails = () => {
 
   const handleGetDirections = async () => {
     try {
-      if (!data?.name) {
-        throw new Error("Hotel name not available");
-      }
-      const currentLocation = userLocation || await getUserLocation();
-      // Use hotel name for destination in Google Maps
-      const destination = encodeURIComponent(data.name + (data.city ? ", " + data.city : ""));
-      const origin = currentLocation ? `${currentLocation.lat},${currentLocation.lng}` : "";
-      const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
-      window.open(url, "_blank", "noopener,noreferrer");
-    } catch (err) {
-      // Fallback: search by hotel name
-      if (data?.name) {
+      // Check if hotel has coordinates
+      const hasCoordinates = (data?.location?.coordinates && data.location.coordinates.length === 2) || 
+                            (data?.latitude && data?.longitude);
+      
+      if (hasCoordinates) {
+        // Use coordinates for precise location
+        const lat = data.location?.coordinates?.[1] || data.latitude;
+        const lng = data.location?.coordinates?.[0] || data.longitude;
+        
+        try {
+          const currentLocation = userLocation || await getUserLocation();
+          // Use coordinates for directions with user location
+          const url = `https://www.google.com/maps/dir/?api=1&origin=${currentLocation.lat},${currentLocation.lng}&destination=${lat},${lng}&travelmode=driving&zoom=15`;
+          window.open(url, "_blank", "noopener,noreferrer");
+        } catch (locationErr) {
+          // User denied location - just show hotel on map
+          const url = `https://www.google.com/maps/place/${lat},${lng}/@${lat},${lng},15z`;
+          window.open(url, "_blank", "noopener,noreferrer");
+        }
+      } else {
+        // Fallback to hotel name search
+        if (!data?.name) {
+          throw new Error("Hotel location not available");
+        }
         const destination = encodeURIComponent(data.name + (data.city ? ", " + data.city : ""));
-        window.open(
-          `https://www.google.com/maps/search/?api=1&query=${destination}`,
-          "_blank",
-          "noopener,noreferrer"
-        );
+        
+        try {
+          const currentLocation = userLocation || await getUserLocation();
+          const url = `https://www.google.com/maps/dir/?api=1&origin=${currentLocation.lat},${currentLocation.lng}&destination=${destination}&travelmode=driving`;
+          window.open(url, "_blank", "noopener,noreferrer");
+        } catch (locationErr) {
+          // User denied location - just search for hotel
+          window.open(
+            `https://www.google.com/maps/search/?api=1&query=${destination}`,
+            "_blank",
+            "noopener,noreferrer"
+          );
+        }
       }
-      setLocationError(err.message);
+    } catch (err) {
+      setLocationError("Could not open directions. Please try again.");
+      console.error("Directions error:", err);
     }
   };
 
@@ -232,11 +254,19 @@ const HotelDetails = () => {
             <Heart size={20} fill={isFavorite ? "currentColor" : "none"} />
             {isFavorite ? "Saved" : "Save"}
           </button>
+          <button
+            className="directions-button-detail"
+            onClick={handleGetDirections}
+            aria-label="Get directions to this hotel"
+          >
+            <Navigation size={20} />
+            Get Directions
+          </button>
         </div>
 
         {/* Embedded Google Maps for hotel location */}
         <div style={{ width: "100%", height: "350px", marginBottom: "24px", borderRadius: "16px", overflow: "hidden", boxShadow: "0 4px 24px rgba(67, 97, 238, 0.08)" }}>
-          {data?.location?.coordinates ? (
+          {(data?.location?.coordinates && data.location.coordinates.length === 2) ? (
             (() => {
               const [lng, lat] = data.location.coordinates;
               return (
@@ -252,6 +282,17 @@ const HotelDetails = () => {
                 />
               );
             })()
+          ) : (data?.latitude && data?.longitude) ? (
+            <iframe
+              title="Hotel Location Map"
+              width="100%"
+              height="100%"
+              style={{ border: 0 }}
+              loading="lazy"
+              allowFullScreen
+              referrerPolicy="no-referrer-when-downgrade"
+              src={`https://www.google.com/maps?q=${data.latitude},${data.longitude}&hl=en&z=15&output=embed`}
+            />
           ) : (
             <iframe
               title="Hotel Location Map"

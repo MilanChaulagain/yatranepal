@@ -8,6 +8,17 @@ const HotelSchema = new mongoose.Schema({
     distance: { type: String, required: true },
     latitude: { type: Number },
     longitude: { type: Number },
+    location: {
+        type: {
+            type: String,
+            enum: ['Point'],
+            default: 'Point'
+        },
+        coordinates: {
+            type: [Number], // [longitude, latitude]
+            default: undefined
+        }
+    },
     photos: { type: [String] },
     title: { type: String, required: true },
     desc: { type: String, required: true },

@@ -59,19 +59,38 @@
   background: #f43f5e;
   color: white;
 }
-.directions-button {
-  background: #4361ee;
+
+.directions-button,
+.directions-button-detail {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 25px -5px rgba(102, 126, 234, 0.3);
 }
-.directions-button:hover:not(:disabled) {
-  background: #3f37c9;
+
+.directions-button:hover:not(:disabled),
+.directions-button-detail:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 20px 40px -10px rgba(102, 126, 234, 0.4);
 }
-.directions-button:disabled {
+
+.directions-button:disabled,
+.directions-button-detail:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+.directions-button-detail svg,
+.directions-button svg {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 .location-error {
