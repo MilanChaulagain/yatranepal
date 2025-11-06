@@ -115,6 +115,7 @@ const AppContent = () => {
         <Route path="/reset-password/:token" element={<ResetPassword />} />
         <Route path="/payment-success" element={<PaymentSuccess />} />
         <Route path="/payment-failure" element={<PaymentFailure />} />
+        
       </Routes>
     </div>
   );

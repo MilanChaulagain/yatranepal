@@ -7,7 +7,11 @@ import {
     getAllPlaces,
     getPlaceById,
     getPlacesByCategory,
-    updatePlace
+    updatePlace,
+    compareAlgorithms,
+    getAllAnalysis,
+    getAnalysisById,
+    getAnalysisStats
 } from '../controllers/place.js';
 
 const router = express.Router();
@@ -26,6 +30,18 @@ router.get('/categories/all', getAllCategories);
 
 // Get all available cities
 router.get('/cities', getAllCities);
+
+// Compare Haversine vs Vincenty algorithms
+router.get('/algorithms/compare', compareAlgorithms);
+
+// Get all algorithm analyses
+router.get('/analysis/all', getAllAnalysis);
+
+// Get algorithm analysis statistics
+router.get('/analysis/stats', getAnalysisStats);
+
+// Get algorithm analysis by ID
+router.get('/analysis/:id', getAnalysisById);
 
 // Get place by ID
 router.get('/:id', getPlaceById);

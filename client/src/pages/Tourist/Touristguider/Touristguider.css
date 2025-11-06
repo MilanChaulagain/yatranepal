@@ -61,6 +61,37 @@
     outline: none;
 }
 
+/* Error state for inputs */
+.tourist-form-group input.input-error {
+    border-color: #ff4444 !important;
+    background: rgba(255, 68, 68, 0.1) !important;
+}
+
+.tourist-form-group input.input-error:focus {
+    border-color: #ff4444 !important;
+    box-shadow: 0 0 0 3px rgba(255, 68, 68, 0.2);
+}
+
+/* Field error message */
+.field-error {
+    display: block;
+    color: #ff6b6b;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .tourist-form-group input[type="file"] {
     width: 100%;
     padding: 0.5rem;
@@ -75,6 +106,11 @@
 
 .tourist-form-group input[type="file"]:hover {
     border-color: #00a3cc;
+}
+
+.tourist-form-group input[type="file"].input-error {
+    border-color: #ff4444 !important;
+    background: rgba(255, 68, 68, 0.1) !important;
 }
 
 .tourist-image-preview {

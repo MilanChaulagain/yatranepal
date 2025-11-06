@@ -19,6 +19,15 @@ const RegisterPage = () => {
         password: "",
         confirmPassword: "",
     })
+    const [errors, setErrors] = useState({
+        username: "",
+        email: "",
+        city: "",
+        phone: "",
+        password: "",
+        confirmPassword: "",
+    })
+    const [isCheckingPhone, setIsCheckingPhone] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirmPassword, setShowConfirmPassword] = useState(false)
     const [imageFile, setImageFile] = useState(null)
@@ -31,9 +40,163 @@ const RegisterPage = () => {
 
     const countries = ["Nepal", "United States", "Canada", "United Kingdom", "Australia", "Germany", "France", "Japan", "Brazil", "India", "China", "Mexico", "Italy", "Spain", "Netherlands", "Sweden", "Norway", "Denmark", "Finland"]
 
+    // Validation functions
+    const validateUsername = (username) => {
+        if (!username.trim()) {
+            return "Username is required"
+        }
+        if (username.length < 3) {
+            return "Username must be at least 3 characters"
+        }
+        if (username.length > 20) {
+            return "Username must be less than 20 characters"
+        }
+        if (/^\d/.test(username)) {
+            return "Username cannot start with a number"
+        }
+        if (/\s/.test(username)) {
+            return "Username cannot contain spaces"
+        }
+        if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+            return "Username can only contain letters, numbers, and underscores"
+        }
+        return ""
+    }
+
+    const validateEmail = (email) => {
+        if (!email.trim()) {
+            return "Email is required"
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(email)) {
+            return "Please enter a valid email address"
+        }
+        return ""
+    }
+
+    const validateCity = (city) => {
+        if (!city.trim()) {
+            return "City is required"
+        }
+        if (city.length < 2) {
+            return "City name must be at least 2 characters"
+        }
+        if (!/^[a-zA-Z\s]+$/.test(city)) {
+            return "City name can only contain letters and spaces"
+        }
+        return ""
+    }
+
+    const validatePhone = (phone) => {
+        if (!phone.trim()) {
+            return "Phone number is required"
+        }
+        // Remove spaces, dashes, and parentheses for validation
+        const cleanPhone = phone.replace(/[\s\-()]/g, '')
+        if (!/^\+?[0-9]{10,15}$/.test(cleanPhone)) {
+            return "Please enter a valid phone number (10-15 digits)"
+        }
+        return ""
+    }
+
+    // Check if phone number already exists in database
+    const checkPhoneExists = async (phone) => {
+        if (!phone || phone.trim() === "") return false
+        
+        try {
+            const response = await axios.get(
+                `http://localhost:8800/api/users/check-phone?phone=${encodeURIComponent(phone)}`
+            )
+            return response.data.exists
+        } catch (error) {
+            console.error("Error checking phone:", error)
+            return false
+        }
+    }
+
+    const validatePassword = (password) => {
+        if (!password) {
+            return "Password is required"
+        }
+        if (password.length < 8) {
+            return "Password must be at least 8 characters"
+        }
+        if (!/[A-Z]/.test(password)) {
+            return "Password must contain at least one uppercase letter"
+        }
+        if (!/[a-z]/.test(password)) {
+            return "Password must contain at least one lowercase letter"
+        }
+        if (!/[0-9]/.test(password)) {
+            return "Password must contain at least one number"
+        }
+        return ""
+    }
+
+    const validateConfirmPassword = (confirmPassword, password) => {
+        if (!confirmPassword) {
+            return "Please confirm your password"
+        }
+        if (confirmPassword !== password) {
+            return "Passwords do not match"
+        }
+        return ""
+    }
+
     const handleChange = (e) => {
         const { id, value } = e.target
         setFormData(prev => ({ ...prev, [id]: value }))
+
+        // Real-time validation
+        let error = ""
+        switch (id) {
+            case "username":
+                error = validateUsername(value)
+                break
+            case "email":
+                error = validateEmail(value)
+                break
+            case "city":
+                error = validateCity(value)
+                break
+            case "phone":
+                error = validatePhone(value)
+                // Check phone uniqueness if validation passes
+                if (!error && value.trim()) {
+                    setIsCheckingPhone(true)
+                    // Debounce the API call
+                    const timeoutId = setTimeout(async () => {
+                        const exists = await checkPhoneExists(value)
+                        if (exists) {
+                            setErrors(prev => ({ 
+                                ...prev, 
+                                phone: "This phone number is already registered" 
+                            }))
+                        }
+                        setIsCheckingPhone(false)
+                    }, 500)
+                    // Clear previous timeout
+                    return () => clearTimeout(timeoutId)
+                }
+                break
+            case "password":
+                error = validatePassword(value)
+                // Also revalidate confirm password if it has a value
+                if (formData.confirmPassword) {
+                    setErrors(prev => ({
+                        ...prev,
+                        confirmPassword: validateConfirmPassword(formData.confirmPassword, value)
+                    }))
+                }
+                break
+            case "confirmPassword":
+                error = validateConfirmPassword(value, formData.password)
+                break
+            default:
+                break
+        }
+
+        setErrors(prev => ({ ...prev, [id]: error }))
     }
 
     const handleImageChange = (e) => {
@@ -81,19 +244,38 @@ const RegisterPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault()
         setLocalError("")
-        setIsLoading(true)
+        
+        // Validate all fields before submission
+        const newErrors = {
+            username: validateUsername(formData.username),
+            email: validateEmail(formData.email),
+            city: validateCity(formData.city),
+            phone: validatePhone(formData.phone),
+            password: validatePassword(formData.password),
+            confirmPassword: validateConfirmPassword(formData.confirmPassword, formData.password),
+        }
+        
+        setErrors(newErrors)
+        
+        // Check if there are any errors
+        const hasErrors = Object.values(newErrors).some(error => error !== "")
+        if (hasErrors) {
+            setLocalError("Please fix all validation errors before submitting")
+            return
+        }
 
-        // Client-side validations
-        if (formData.password !== formData.confirmPassword) {
-            setLocalError("Passwords do not match.")
-            setIsLoading(false)
+        // Check phone uniqueness before submission
+        const phoneExists = await checkPhoneExists(formData.phone)
+        if (phoneExists) {
+            setErrors(prev => ({ 
+                ...prev, 
+                phone: "This phone number is already registered" 
+            }))
+            setLocalError("This phone number is already registered")
             return
         }
-        if (formData.password.length < 8) {
-            setLocalError("Password must be at least 8 characters long.")
-            setIsLoading(false)
-            return
-        }
+
+        setIsLoading(true)
 
         try {
             console.log("Starting registration process...")
@@ -248,8 +430,9 @@ const RegisterPage = () => {
                                     value={formData.username} 
                                     onChange={handleChange} 
                                     required 
-                                    className="form-input" 
+                                    className={`form-input ${errors.username ? 'input-error' : ''}`}
                                 />
+                                {errors.username && <span className="field-error">{errors.username}</span>}
                             </div>
                             <div className="form-group">
                                 <label htmlFor="email" className="form-label"><Mail size={16} /> Email *</label>
@@ -260,8 +443,9 @@ const RegisterPage = () => {
                                     value={formData.email} 
                                     onChange={handleChange} 
                                     required 
-                                    className="form-input" 
+                                    className={`form-input ${errors.email ? 'input-error' : ''}`}
                                 />
+                                {errors.email && <span className="field-error">{errors.email}</span>}
                             </div>
                         </div>
 
@@ -291,8 +475,9 @@ const RegisterPage = () => {
                                     value={formData.city} 
                                     onChange={handleChange} 
                                     required 
-                                    className="form-input" 
+                                    className={`form-input ${errors.city ? 'input-error' : ''}`}
                                 />
+                                {errors.city && <span className="field-error">{errors.city}</span>}
                             </div>
                         </div>
 
@@ -306,8 +491,9 @@ const RegisterPage = () => {
                                 value={formData.phone} 
                                 onChange={handleChange} 
                                 required 
-                                className="form-input" 
+                                className={`form-input ${errors.phone ? 'input-error' : ''}`}
                             />
+                            {errors.phone && <span className="field-error">{errors.phone}</span>}
                         </div>
 
                         {/* Password & Confirm */}
@@ -323,7 +509,7 @@ const RegisterPage = () => {
                                         onChange={handleChange} 
                                         required 
                                         minLength={8} 
-                                        className="form-input" 
+                                        className={`form-input ${errors.password ? 'input-error' : ''}`}
                                     />
                                     <button 
                                         type="button" 
@@ -333,6 +519,7 @@ const RegisterPage = () => {
                                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                     </button>
                                 </div>
+                                {errors.password && <span className="field-error">{errors.password}</span>}
                             </div>
                             <div className="form-group">
                                 <label htmlFor="confirmPassword" className="form-label"><Lock size={16} /> Confirm Password *</label>
@@ -345,7 +532,7 @@ const RegisterPage = () => {
                                         onChange={handleChange} 
                                         required 
                                         minLength={8} 
-                                        className="form-input" 
+                                        className={`form-input ${errors.confirmPassword ? 'input-error' : ''}`}
                                     />
                                     <button 
                                         type="button" 
@@ -355,6 +542,7 @@ const RegisterPage = () => {
                                         {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                     </button>
                                 </div>
+                                {errors.confirmPassword && <span className="field-error">{errors.confirmPassword}</span>}
                             </div>
                         </div>
 

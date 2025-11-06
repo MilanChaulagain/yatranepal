@@ -67,21 +67,6 @@ app.use(cors({
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 }));
-// app.use(cors({
-//   origin: function (origin, callback) {
-//     // allow requests with no origin (like mobile apps, Postman)
-//     if (!origin) return callback(null, true);
-
-//     if (allowedOrigins.indexOf(origin) === -1) {
-//       const msg = "The CORS policy for this site does not allow access from the specified Origin.";
-//       return callback(new Error(msg), false);
-//     }
-//     return callback(null, true);
-//   },
-//   credentials: true,          // allow cookies and Authorization headers
-//   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-//   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
-// }));
 
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
