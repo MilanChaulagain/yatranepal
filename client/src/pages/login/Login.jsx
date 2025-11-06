@@ -67,12 +67,28 @@ const Login = () => {
             toast.success(`Welcome ${res.data.details.username}`)
             navigate("/");
         } catch (err) {
-            console.log("Login failed");
-            toast.error("Login failed");
-            dispatch({
-                type: "LOGIN_FAILURE",
-                payload: err.response?.data || { message: "Login failed." },
-            });
+            console.log("Login failed", err.response?.data);
+            
+            // Check if error is due to email verification
+            if (err.response?.data?.requiresVerification) {
+                toast.error("Please verify your email before logging in");
+                toast("We'll redirect you to enter your verification code", { icon: "📧" });
+                
+                // Redirect to OTP verification page with email
+                setTimeout(() => {
+                    navigate("/verify-otp", { 
+                        state: { 
+                            email: err.response.data.email 
+                        } 
+                    });
+                }, 1500);
+            } else {
+                toast.error(err.response?.data?.message || "Login failed");
+                dispatch({
+                    type: "LOGIN_FAILURE",
+                    payload: err.response?.data || { message: "Login failed." },
+                });
+            }
         }
     };
 

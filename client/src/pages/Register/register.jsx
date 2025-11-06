@@ -316,44 +316,25 @@ const RegisterPage = () => {
                     }
                 }
             )
-            localStorage.setItem("token", registerResponse.data.token)
             console.log("Registration successful:", registerResponse.data)
 
-            // Auto-login after registration
-
-            const token = localStorage.getItem("token");
-            console.log("Attempting auto-login...")
-            const loginRes = await axios.post(
-                "http://localhost:8800/api/auth/login", 
-                {
-                    username: formData.username,
-                    password: formData.password
-                },
-                {
-                    withCredentials: true,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    }
-                }
-            )
-
-            console.log("Login successful:", loginRes.data)
-
-            // Save user data and token
-            if (loginRes.data.details) {
-                localStorage.setItem("user", JSON.stringify(loginRes.data.details))
+            // Check if email verification is required
+            if (registerResponse.data.requiresVerification) {
+                toast.success("Registration successful! Please check your email for the verification code.");
+                toast("We've sent a 6-digit code to your email", { icon: "📧" });
+                
+                // Redirect to OTP verification page
+                navigate("/verify-otp", { 
+                    state: { 
+                        email: formData.email,
+                        userId: registerResponse.data.userId 
+                    } 
+                });
+            } else {
+                // Fallback to auto-login if verification not required (shouldn't happen in production)
+                toast.success("Registration successful!");
+                navigate("/login");
             }
-            if (loginRes.data.token) {
-                localStorage.setItem("token", loginRes.data.token)
-            }
-
-            // Update auth context
-            dispatch({ type: "LOGIN_SUCCESS", payload: loginRes.data.details })
-            
-            toast.success("Registered successfully");
-            toast.success(`Welcome, ${loginRes.data.username}`)
-            navigate("/")
             
         } catch (err) {
             console.error("Registration error:", err)

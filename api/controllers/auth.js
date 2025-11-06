@@ -24,8 +24,10 @@ export const register = async (req, res, next) => {
             return res.status(400).json({ message: "Username or email already exists." });
         }
 
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        
         // Create new user (password will be hashed by pre-save hook)
-
         const newUser = new User({
             username,
             email,
@@ -35,11 +37,50 @@ export const register = async (req, res, next) => {
             country,
             img: img || "",
             role: role || "user",
+            isEmailVerified: false,
+            emailVerificationOTP: otp,
+            emailVerificationOTPExpires: Date.now() + 15 * 60000, // 15 minutes
         });
 
         await newUser.save();
 
-        res.status(201).json({ message: "User registered successfully", userId: newUser._id });
+        // Send OTP email
+        console.log(`📧 Attempting to send OTP to: ${email}`);
+        
+        const emailMessage = `
+Hello ${username},
+
+Welcome to YatraNepal! 
+
+Your email verification code is: ${otp}
+
+This code will expire in 15 minutes.
+
+If you did not create an account, please ignore this email.
+
+Best regards,
+YatraNepal Team
+        `;
+
+        try {
+            await sendEmail(email, "Verify Your Email - YatraNepal", emailMessage);
+            console.log(`✅ OTP sent successfully to: ${email}`);
+            
+            res.status(201).json({ 
+                message: "Registration successful! Please check your email for the verification code.",
+                requiresVerification: true,
+                userId: newUser._id,
+                email: newUser.email
+            });
+        } catch (emailError) {
+            // If email fails, delete the user and return error
+            await User.findByIdAndDelete(newUser._id);
+            console.error("Error sending OTP email:", emailError);
+            return res.status(500).json({
+                message: "Failed to send verification email. Please try again.",
+                error: true
+            });
+        }
     } catch (err) {
         next(err);
     }
@@ -57,6 +98,15 @@ export const login = async (req, res, next) => {
             console.log("user not found")
             return next(createError(404, "User not found!"))
         };
+
+        // Check if email is verified
+        if (!user.isEmailVerified) {
+            return res.status(403).json({ 
+                message: "Please verify your email before logging in. Check your inbox for the verification code.",
+                requiresVerification: true,
+                email: user.email
+            });
+        }
 
         const isPasswordCorrect = await bcrypt.compare(password, user.password);
         if (!isPasswordCorrect) {
@@ -105,6 +155,98 @@ export const checkAuth = (req, res) => {
             isAdmin: user.isAdmin,
         });
     });
+};
+
+// VERIFY OTP
+export const verifyOTP = async (req, res, next) => {
+    try {
+        const { email, otp } = req.body;
+
+        if (!email || !otp) {
+            return res.status(400).json({ message: "Email and OTP are required" });
+        }
+
+        // Find user with matching email and valid OTP
+        const user = await User.findOne({
+            email,
+            emailVerificationOTP: otp,
+            emailVerificationOTPExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({
+                message: "Invalid or expired OTP. Please request a new one.",
+                expired: true
+            });
+        }
+
+        // Update user - mark email as verified and clear OTP
+        user.isEmailVerified = true;
+        user.emailVerificationOTP = null;
+        user.emailVerificationOTPExpires = null;
+        await user.save();
+
+        res.status(200).json({
+            message: "Email verified successfully! You can now log in.",
+            success: true
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// RESEND OTP
+export const resendOTP = async (req, res, next) => {
+    try {
+        const { email } = req.body;
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ message: "User not found with this email" });
+        }
+
+        // Check if already verified
+        if (user.isEmailVerified) {
+            return res.status(400).json({ message: "Email is already verified. Please log in." });
+        }
+
+        // Generate new 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        user.emailVerificationOTP = otp;
+        user.emailVerificationOTPExpires = Date.now() + 15 * 60000; // 15 minutes
+        await user.save();
+
+        // Send OTP email
+        const emailMessage = `
+Hello ${user.username},
+
+Your new email verification code is: ${otp}
+
+This code will expire in 15 minutes.
+
+If you did not request this, please ignore this email.
+
+Best regards,
+YatraNepal Team
+        `;
+
+        try {
+            await sendEmail(email, "Verify Your Email - YatraNepal", emailMessage);
+
+            res.status(200).json({
+                message: "Verification code sent successfully! Please check your inbox.",
+                success: true
+            });
+        } catch (emailError) {
+            console.error("Error sending OTP email:", emailError);
+            res.status(500).json({
+                message: "Failed to send verification code. Please try again later.",
+                error: true
+            });
+        }
+    } catch (err) {
+        next(err);
+    }
 };
 
 // FORGOT PASSWORD

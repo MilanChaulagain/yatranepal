@@ -40,6 +40,18 @@ const userSchema = new mongoose.Schema({
         enum: ["user", "tourist guide"],
         default: "user",
     },
+    isEmailVerified: {
+        type: Boolean,
+        default: false,
+    },
+    emailVerificationOTP: {
+        type: String,
+        default: null,
+    },
+    emailVerificationOTPExpires: {
+        type: Date,
+        default: null,
+    },
     resetPasswordToken: {
         type: String,
         default: null,

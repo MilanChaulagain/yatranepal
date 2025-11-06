@@ -10,6 +10,7 @@ import Hotel from "./pages/hotel/Hotel";
 import List from "./pages/list/List";
 import LoginPage from "./pages/login/Login";
 import RegisterPage from "./pages/Register/register";
+import VerifyOTP from "./pages/VerifyOTP/VerifyOTP";
 import Profile from "./pages/profile/profile";
 import Stays from "./pages/stays/stays";
 import Flights from "./pages/flights/flights";
@@ -81,6 +82,7 @@ const AppContent = () => {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/verify-otp" element={<VerifyOTP />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/stays" element={<Stays />} />
         <Route path="/stays/:id" element={<HotelDetails />} />
